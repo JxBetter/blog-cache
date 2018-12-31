@@ -1,0 +1,89 @@
+flask-restful
+先看一个以flask为框架，写的爬虫路由接口
+
+
+import requests
+import pyquery
+from flask import Flask,render_template,redirect,url_for,make_response
+from flask_wtf import FlaskForm
+from flask_bootstrap import Bootstrap
+from flask_sqlalchemy import SQLAlchemy
+from wtforms import StringField,SubmitField
+from wtforms.validators import DataRequired
+
+app = Flask(name)
+
+
+class Spider(FlaskForm):
+    key = StringField('search key',validators=[DataRequired()])
+    submit = SubmitField('search')
+
+
+@app.route('/spider',methods=['get','post'])
+def spider():
+    form = Spider()
+    if form.validate_on_submit():
+        html = requests.get('https://search.jd.com/Search?keyword='+form.key.data+'&enc=utf-8')
+        html = html.text
+        r = pyquery.PyQuery(html)
+        imgs_list = []
+        for img in r('img'):
+            if r(img).attr('src') is not None:
+                imgs_list.append('http://' + r(img).attr('src')[2:])
+            if r(img).attr('data-lazy-img') is not None:
+                imgs_list.append('http://' + r(img).attr('data-lazy-img')[2:])
+        return  render_template('imgs.html',imgs=imgs_list)
+    return render_template('spider.html',form=form)
+
+
+
+
+
+
+接下来用flask-restful模块来将上述接口改成RESTful api
+
+
+import requests
+import pyquery
+from flask import Flask,render_template,redirect,url_for,make_response
+from flask_wtf import FlaskForm
+from flask_bootstrap import Bootstrap
+from flask_sqlalchemy import SQLAlchemy
+from wtforms import StringField,SubmitField
+from wtforms.validators import DataRequired
+from flask_restful import Resource,Api
+
+app = Flask(name)
+api = Api(app)
+
+
+class SpiderResource(Resource):
+    def init(self):
+        self.form = Spider()
+
+
+def get(self):
+    return render_template('spider.html', form=self.form)
+
+def post(self):
+    html = requests.get('https://search.jd.com/Search?keyword=' + self.form.key.data + '&enc=utf-8')
+    html = html.text
+    r = pyquery.PyQuery(html)
+    imgs_list = []
+    for img in r('img'):
+        if r(img).attr('src') is not None:
+            imgs_list.append('http://' + r(img).attr('src')[2:])
+        if r(img).attr('data-lazy-img') is not None:
+            imgs_list.append('http://' + r(img).attr('data-lazy-img')[2:])
+    return render_template('imgs.html', imgs=imgs_list)
+
+@api.representation("text/html")
+def out_html(data, code, headers=None):
+    resp = make_response(data, code)
+    resp.headers.extend(headers or {})
+    return resp
+
+api.add_resource(SpiderResource,'/spider')
+
+
+将一个路由看成资源来通过不同的方法来获取或改变，定义了get和post方法来区分请求是get还是post，不同的方法对应着不同的逻辑处理 由于restful默认输出的是json格式，需要将其转换成html格式以便于浏览器渲染，用到了api.representation这个装饰器

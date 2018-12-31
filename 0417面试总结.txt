@@ -1,0 +1,76 @@
+很棒的一次面试,发现了自己能力不足,有两道笔试题总结一下
+
+1.
+def foo(l):
+    l += [3,4]
+    l = [5,6]
+
+l = [1,2]
+foo(l)
+print(l)  #[1,2,3,4]
+
+为什么是[1,2,3,4]呢,因为形参l和列表l是两个变量,只是指向了同一个对象,最后形参l指向了[5,6],但是外部的l还是指向着改变过的列表[1,2,3,4], 而print的是外部的l,所以答案是[1,2,3,4].
+
+
+2.
+class LockerA(object):
+    @staticmethod
+    def acquire():
+        print('LockerA acquire called')
+
+    @staticmethod
+    def unlock():
+        print('LockerA unlock called')
+
+
+class LockerB(object):
+    @staticmethod
+    def acquire():
+        print('LockerB acquire called')
+
+    @staticmethod
+    def unlock():
+        print('LockerB unlock called')
+
+
+def locker_helper(cls):
+    print('locker helper called,{}'.format(cls.__name__))
+
+    def _decorate_a(func):
+        print('in decorate a, {} called'.format(func.__name__))
+
+        def _decorate_b(*args,**kwargs):
+            print('in decorate b,{} called'.format(func.__name__))
+            cls.acquire()
+            try:
+                return func(*args,**kwargs)
+            finally:
+                cls.unlock()
+        return _decorate_b
+    return _decorate_a
+
+
+@locker_helper(LockerA)
+@locker_helper(LockerB)
+def foo(a,b):
+    print('foo called')
+    return a+b
+
+print(foo(1,2))
+
+这题遇到后真的要哭了...带参数的装饰器嵌套还真的第一次遇到,直接贴答案吧
+
+locker helper called,LockerA
+locker helper called,LockerB
+in decorate a, foo called
+in decorate a, _decorate_b called
+in decorate b,_decorate_b called
+LockerA acquire called
+in decorate b,foo called
+LockerB acquire called
+foo called
+LockerB unlock called
+LockerA unlock called
+3
+
+最后数据库和设计模式类的问题没有仔细了解过,所以这是欠缺的地方,继续努力提高自己吧!

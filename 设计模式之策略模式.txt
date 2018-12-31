@@ -1,0 +1,66 @@
+策略模式的组件主要为策略对象和策略的操作环境，
+接下来我把策略模式应用到一个爬虫应用中来，看看其优点。
+
+爬虫爬取静态页面
+
+"""
+Author: jx
+Version: V0.0.1
+Time: 2018-06-14 13:58
+"""
+import requests
+import pyquery
+
+class CrawlMethods:
+    """
+    Abstract base class
+    """
+    def crawl(self, url):
+        pass
+
+class Comment(CrawlMethods):
+    """
+    Class of crawl the comments from www.nosetime.com,
+    if you want to crawl others such as pics, you can
+    rebuild a new class (maybe class Pic) and inherit
+    from the absract base class CrawlMethods, then
+    rewrite the method crawl.
+    """
+    def crawl(self, url):
+        res = []
+        origin = requests.get(url)
+        html = pyquery.PyQuery(origin)
+        title = html('.comment a').text()
+        comment = html('.desc').text()
+        for i in range(len(title)):
+            res.append({
+                'title': title[i],
+                'comment': comment[i],
+            })
+        return res
+
+class NoseTimeCrawl:
+    def methods_dict(self, crawl_type):
+        """
+        :param crawl_type: crawl type(pic,comment ...)
+        :return: en object of a method class,
+        you can use its crawl method to get data what you want.
+        """
+        dic = {
+            'comment':Comment()
+        }
+        return dic.get(crawl_type, None)
+
+    def run(self, crawl_type, url):
+        res = None
+        obj = self.methods_dict(crawl_type)
+        if obj:
+            res = obj.crawl(url)
+        return res
+
+
+if __name__ == '__main__':
+    sp = NoseTimeCrawl()
+    print(sp.run('comment', 'http://www.nosetime.com'))
+
+我先创建一个抽象基类CrawlMethods，对于一个网站可以针对不同的数据编写不同的方法来爬取，在这个抽象类中定义了一个抽象方法crawl 每一个继承这个抽象类的子类都会实现这个抽象方法，当需要增加方法时只需要增加一个继承自CrawlMethods的类并重写抽象方法crawl即可。

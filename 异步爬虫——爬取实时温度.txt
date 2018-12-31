@@ -1,0 +1,114 @@
+异步爬虫简单可视化
+今天下午花了点时间写了个脚本，爬取全国各省会实时温度，并用matplotlib做成折线图，虽然是一个简单的脚本也遇到了一些问题，我发现中央气象网通过一个接口返回json来提供实时温度，并且对请求时间要求有一定间隔，所以异步并没有发挥其作用，不过我还是用异步来写，熟练一下asyncio和aiohttp这两个库
+这个脚本主要用到两个三方库：1、matplotlib，2、aiohttp
+
+
+脚本的主要函数：
+	get_url(city)
+	通过城市名来返回对应的url
+	get_temperature(city)
+	返回城市的实时温度，由于从接口返回的是json格式，使用loads转换成字典格式来提取数据
+	aio_city(city, d)
+	由于是异步，每一个异步协程请求获取一个城市的温度，将所有协程加入事件循环，当一个协程遇到await阻塞则调用下一个协程，并且需要使用aiohttp这个库，因为它的请求是异步非阻塞的，而我们常用的requests库是阻塞的，所以我们必须搭配起来用
+	main()
+	主函数处理数据并作图，数据和图片每小时更新，在一个小时内运行脚本只会有一次是执行的，检测到本地文件夹存在当前小时的数据时就不会重新下载生成图片，也算是一种缓存的思想，虽然比较low
+
+
+
+import os
+import json
+import asyncio
+import aiohttp
+import matplotlib.pyplot as plt
+from pylab import *
+
+myfont = matplotlib.font_manager.FontProperties(fname='/home/jx/others/fangsong.ttf')
+
+
+def get_url(city):
+    city_id = {'北京': '54511', '天津': '54517', '石家庄': '53698', '太原': '53772',
+               '呼和浩特': '53463', '沈阳': '54342', '长春': '54161', '哈尔滨': '50953',
+               '上海': '58367', '南京': '58238', '杭州': '58457', '合肥': '58321', '福州': '58847',
+               '南昌': '58606', '济南': '54823', '郑州': '57083', '武汉': '57494', '长沙': '57679',
+               '广州': '59287', '深圳': '59493', '南宁': '59431', '海口': '59758', '重庆': '57516',
+               '成都': '56294', '贵阳': '57816', '昆明': '56778', '拉萨': '55591', '西安': '57036',
+               '兰州': '52889', '西宁': '52866', '银川': '53614', '乌鲁木齐': '51463',
+               }
+    return 'http://www.nmc.cn/f/rest/real/' + city_id[city]
+
+
+async def get_temperature(city):
+    async with aiohttp.ClientSession()as session:
+        async with session.get(get_url(city)) as html:
+            html_text = await html.text()
+            js = json.loads(html_text)
+            return js['weather']['temperature']
+
+
+async def aio_city(city, d):
+    t = await get_temperature(city)
+    d[city] = t
+
+
+if __name__ == '__main__':
+    img_path = time.strftime('%m-%d_%H') + '.png'
+    temp_path = time.strftime('%m-%d_%H') + '.txt'
+    cities = ['北京', '天津', '石家庄', '太原', '呼和浩特', '沈阳', '长春', '哈尔滨', '上海', '南京',
+              '杭州', '合肥', '福州', '南昌', '济南', '郑州', '武汉', '长沙', '广州', '深圳',
+              '南宁', '海口', '重庆', '成都', '贵阳', '昆明', '拉萨', '西安', '兰州', '西宁',
+              '银川', '乌鲁木齐', ]
+    c = []
+    tasks = []
+    city_tem = {}
+    if not os.path.exists('data'):
+        os.mkdir('data')
+    if not os.path.exists('./data/' + temp_path):
+        for city in cities:
+            c.append(aio_city(city, city_tem))
+        for i in range(len(c)):
+            tasks.append(asyncio.ensure_future(c[i]))
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(asyncio.wait(tasks))
+        loop.close()
+        with open('./data/' + temp_path, 'w') as f:
+            f.write(json.dumps(city_tem, ensure_ascii=False))
+    else:
+        with open('./data/' + temp_path, 'r') as f:
+            city_tem = json.loads(f.read())
+    if not os.path.exists('./data/' + img_path):
+        city_tem = sorted(city_tem.items(), key=lambda x: x[1])
+        order_city = []
+        order_temp = []
+        for q in city_tem:
+            order_city.append(q[0])
+            order_temp.append(q[1])
+        x = range(len(cities))
+        y = order_temp
+        plt.plot(x, y, 'r')
+        plt.title('北京时间'+time.strftime('%m月%d日%H时全国天气走势图'),fontproperties=myfont)
+        plt.ylabel('温度(摄氏度)',fontproperties=myfont)
+        plt.xticks(x, order_city, rotation=75, fontproperties=myfont)
+        plt.savefig('./data/' + img_path)
+        plt.show()
+    else:
+        print('当前小时的数据已经保存在当前目录的data文件夹下，请查看')
+
+
+
+
+写脚本时遇到的问题主要有三个
+1. json dumps保存到本地时，中文乱码的问题
+解决方法，json.dumps(ensure_ascii=False)，将ensure_ascii设为False
+
+2. aiohttp请求数据
+
+    async with aiohttp.ClientSession()as session:
+        async with session.get(url) as resp:
+        print(resp.text())
+
+对asnycio这个库还在学习中，以后也会写一篇总结
+
+
+
+3. matplotlib中文显示问题
+确保本地有需要的字体文件，比如ttf，然后通过matplotlib的字体管理器设置，myfont = matplotlib.font_manager.FontProperties(fname='/home/jx/others/fangsong.ttf')， 最后在需要使用中文的地方，比如plt.ylabel('温度(摄氏度)',fontproperties=myfont)中使用fontproperties=myfont来设置字体

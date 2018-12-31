@@ -1,0 +1,15 @@
+tkinter实现GUI
+用tkinter创建一个窗口,以及一个按钮,按钮按下后开始爬取数据,异步爬虫的代码还是用的上一次写的,这个主要增加了一个GUI类
+
+
+class VTGUI:
+    def __init__(self):
+        window = tk.Tk()
+        window.title('可视化异步爬虫')
+        frame = tk.Frame(window)
+        frame.pack()
+        tk.Label(frame,text='全国实时温度').pack(side='left')
+        tk.Button(frame,text='开始爬取当前{}时温度'.format(time.strftime('%H')),command=main).pack(side='left')
+        window.mainloop()
+if __name__ == '__main__':
+        VTGUI()

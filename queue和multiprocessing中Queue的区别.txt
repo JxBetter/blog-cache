@@ -1,0 +1,29 @@
+直接说区别：在多进程中，queue中的Queue不会在多进程间共享，而multiprocessing中的Queue会在多进程间共享数据。
+
+from multiprocessing import Process,Queue
+import queue
+
+def write(q,data):
+    for i in range(len(data)):
+        q.put(data[i],block=False)
+    print('write done',q.qsize())
+
+def read(q):
+    while q.qsize():
+        r=q.get()
+        print('read:',r)
+
+if __name__=='__main__':
+    l=[1,2,3]
+    # q=Queue(3)  #multiprocessing中的Queue
+    q=queue.Queue(3)   #queue中的Queue
+    pw=Process(target=write,args=(q,l))
+    pr=Process(target=read,args=(q,))
+
+    pw.start()
+    pw.join()
+
+    pr.start()
+    pr.join()
+
+当q=Queue(3)时pr进程可以从队列中取出数据
